@@ -160,6 +160,7 @@ import com.android.systemui.assist.AssistManager;
 import com.android.systemui.cm.UserContentObserver;
 import com.android.systemui.doze.DozeHost;
 import com.android.systemui.doze.DozeLog;
+import com.android.systemui.doze.ShakeSensorManager;
 import com.android.systemui.keyguard.KeyguardViewMediator;
 import com.android.systemui.navigation.NavigationController;
 import com.android.systemui.navigation.Navigator;
@@ -259,7 +260,7 @@ import cyanogenmod.themes.IThemeService;
 
 public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
         DragDownHelper.DragDownCallback, ActivityStarter, OnUnlockMethodChangedListener,
-        HeadsUpManager.OnHeadsUpChangedListener, WeatherController.Callback {
+        HeadsUpManager.OnHeadsUpChangedListener, WeatherController.Callback , ShakeSensorManager.ShakeListener {
     static final String TAG = "PhoneStatusBar";
     public static final boolean DEBUG = BaseStatusBar.DEBUG;
     public static final boolean SPEW = false;
@@ -411,6 +412,9 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
 
     int mPixelFormat;
     Object mQueueLock = new Object();
+
+    private ShakeSensorManager mShakeSensorManager;
+    private Boolean enableShakeCleanByUser;
 
     StatusBarIconController mIconController;
 
@@ -760,6 +764,9 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
         resolver.registerContentObserver(Settings.Secure.getUriFor(
                     Settings.Secure.FLING_PULSE_ENABLED),
                     false, this, UserHandle.USER_ALL);
+            resolver.registerContentObserver(Settings.System.getUriFor(
+                    Settings.System.SHAKE_CLEAN_NOTIFICATION),
+                    false, this, UserHandle.USER_ALL);                   
 		    update();
         }
 
@@ -1049,6 +1056,10 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
                         CMSettings.System.NAVBAR_LEFT_IN_LANDSCAPE, 0, UserHandle.USER_CURRENT) == 1;
                 mNavigationBarView.setLeftInLandscape(navLeftInLandscape);
             }
+
+            enableShakeCleanByUser = Settings.System.getIntForUser(
+                    resolver, Settings.System.SHAKE_CLEAN_NOTIFICATION, 1,
+                    UserHandle.USER_CURRENT) == 1;
 
             mWeatherTempState = Settings.System.getIntForUser(
                     resolver, Settings.System.STATUS_BAR_SHOW_WEATHER_TEMP, 0,
@@ -1543,6 +1554,19 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
                 CMContextConstants.CM_THEME_SERVICE));
     }
 
+    @Override
+    public synchronized void onShake() {
+        clearAllNotifications();
+    }
+
+    public void enableShake(boolean enableShakeClean) {
+        if (enableShakeClean && enableShakeCleanByUser && mDeviceInteractive) {
+            mShakeSensorManager.enable(20);
+        } else {
+            mShakeSensorManager.disable();
+        }
+    }
+
     // ================================================================================
     // Constructing the view
     // ================================================================================
@@ -1550,6 +1574,7 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
     protected PhoneStatusBarView makeStatusBarView() {
         final Context context = mContext;
 
+        mShakeSensorManager = new ShakeSensorManager(mContext, this);
         Resources res = context.getResources();
 
         mScreenWidth = (float) context.getResources().getDisplayMetrics().widthPixels;
@@ -3511,6 +3536,7 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
         }
 
         mExpandedVisible = true;
+        enableShake(true);
         if (mNavigationBarView != null)
             mNavigationBarView.setSlippery(true);
 
@@ -3644,6 +3670,7 @@ public class PhoneStatusBar extends BaseStatusBar implements DemoMode,
         mNotificationPanel.closeQs();
 
         mExpandedVisible = false;
+        enableShake(false);
         if (mNavigationBarView != null)
             mNavigationBarView.setSlippery(false);
         visibilityChanged(false);

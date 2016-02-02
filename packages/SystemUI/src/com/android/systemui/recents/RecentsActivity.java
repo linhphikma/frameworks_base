@@ -69,7 +69,6 @@ import com.android.systemui.statusbar.phone.NavigationBarView;
 import com.android.systemui.statusbar.phone.PhoneStatusBar;
 import com.android.systemui.recents.views.TaskStackView;
 import cyanogenmod.providers.CMSettings;
->>>>>>> 8b597c3... shake clean recent task
 
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
